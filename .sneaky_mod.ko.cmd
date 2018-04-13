@@ -1,0 +1,1 @@
+cmd_/home/vcm/Rootkit/sneaky_mod.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/vcm/Rootkit/sneaky_mod.ko /home/vcm/Rootkit/sneaky_mod.o /home/vcm/Rootkit/sneaky_mod.mod.o

