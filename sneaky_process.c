@@ -102,7 +102,7 @@ void unload_module() {
 void main() {
   insert_password();
 
-  load_module();
+   load_module();
 
   unload_module();
 
